@@ -1,0 +1,14 @@
+name = "QuantileNN"
+uuid = "def46b05-8f36-4d9e-bd86-05836b3c85d9"
+authors = ["Kerby Shedden <kshedden@umich.edu>"]
+version = "0.1.0"
+
+[deps]
+JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
+LightGraphs = "093fc24a-ae57-5d10-9952-331d41423f4d"
+MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
+NearestNeighbors = "b8a86587-4115-5ab1-83bc-aa920d37bbce"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+Tulip = "6dd1b50a-3aae-11e9-10b5-ef983d2400fa"
