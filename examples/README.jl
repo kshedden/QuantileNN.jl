@@ -6,6 +6,9 @@
 
 # ## Usage
 
+# The following example simulates heteroscedastic data and estimates
+# the 20th, 50th,and 80th conditional quantiles.
+
 ENV["GKSwstype"] = "nul" #hide
 using QuantileNN, Plots, StableRNGs, LaTeXStrings, Statistics, Printf, Distributions
 rng = StableRNG(123)
@@ -24,7 +27,7 @@ bw = 0.4
 yy = [[predict_smooth(m, [0, v, 0], [bw]) for v in x] for m in mm]
 
 ps = [@sprintf("%.2f", p) for p in pp]
-plt = plot(x, yy[1], label=ps[1], xlabel=L"$x$", ylabel=L"$y$")
+plt = plot(x, yy[1], label=ps[1], xlabel=L"$x$", ylabel=L"$y$", size=(400,300))
 plt = plot!(plt, x, yy[2], label=ps[2])
 plt = plot!(plt, x, yy[3], label=ps[3])
 Plots.savefig(plt, "./assets/readme1.svg")
