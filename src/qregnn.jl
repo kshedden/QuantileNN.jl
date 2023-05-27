@@ -1,11 +1,18 @@
-using JuMP, Tulip, Random, Statistics, NearestNeighbors, StatsBase
-using LightGraphs, MathOptInterface
+using JuMP
+using Tulip
+using Random
+using Statistics
+using NearestNeighbors
+using LightGraphs
+using MathOptInterface
+using LinearAlgebra
+using StatsAPI
 
 # Implement the nonparametric quantile regression approach described here:
 # https://arxiv.org/abs/2012.01758
 
 # Representation of a fitted model
-mutable struct Qreg
+mutable struct QNN <: RegressionModel
 
     # The outcome variable
     y::Vector{Float64}
@@ -38,7 +45,7 @@ end
 # Returns the degrees of freedom of the fitted model, which is the
 # number of connected components of the graph defined by all edges
 # of the covariate graph that are fused in the regression fit.
-function degf(qr::Qreg; e = 1e-2)::Int
+function degf(qr::QNN; e = 1e-2)
 
     nn = qr.nn
     fv = qr.fit
@@ -56,7 +63,7 @@ function degf(qr::Qreg; e = 1e-2)::Int
 end
 
 # Returns the BIC for the given fitted model.
-function bic(qr::Qreg)::Tuple{Float64,Int}
+function bic(qr::QNN)::Tuple{Float64,Int}
     d = degf(qr)
     p = qr.p
     resid = qr.y - qr.fit
@@ -68,19 +75,30 @@ function bic(qr::Qreg)::Tuple{Float64,Int}
     return tuple(2 * check / sig + d * log(n), d)
 end
 
-function fittedvalues(qr::Qreg)
+function fitted(qr::QNN)
 	return qr.fit
 end
 
 # Predict the quantile at the point z using k nearest neighbors.
-function predict(qr::Qreg, z::AbstractVector{Float64}; k = 5)::Float64
+function predict(qr::QNN, z::AbstractVector; k = 5)
     ii, _ = knn(qr.kt, z, k)
     return mean(qr.fit[ii])
 end
 
-# Predict the quantile at the point z using local linear regression.
-function predict_smooth(qr::Qreg, z::AbstractVector{Float64}, bw::AbstractVector{Float64})::Float64
-	@assert minimum(bw) > 0
+"""
+   predict_smooth(qr::QNN, z::AbstractVector, bw::AbstractVector)
+
+Predict a quantile at the point z for the fitted model qr.  The
+vector bw contains bandwidths, which can either be the same
+length of z (a bandwidth for each variable), or a vector of
+length 1 (the same bandwidth for all variables).
+"""
+function predict_smooth(qr::QNN, z::AbstractVector, bw::AbstractVector)
+
+    if minimum(bw) <= 0
+        throw(ArgumentError("Bandwidth must be positive"))
+    end
+
     f = qr.fit
     x = qr.x
     n, r = size(x)
@@ -95,21 +113,19 @@ function predict_smooth(qr::Qreg, z::AbstractVector{Float64}, bw::AbstractVector
         xty .= xty + w * f[i] * xr
     end
 
-    b = xtx \ xty
+    b = pinv(xtx) * xty
     return b[1]
 end
 
-# Construct a structure that can be used to perform quantile regression
-# of y on x.  k is the number of nearest neighbors used for regularization.
-function qregnn(y::Vector{Float64}, x::Matrix{Float64}; p::Float64=0.5, k::Int = 5, 
-                lam::Float64=0.1, dofit::Bool=true)::Qreg
+function fit(::Type{QNN}, X::AbstractMatrix, y::AbstractVector;
+             p=0.5, k=5, lam=0.1)
 
     n = length(y)
 
     # Build the nearest neighbor tree, exclude each point from its own
     # neighborhood.
-    kt = KDTree(x')
-    nx, _ = knn(kt, x', k + 1, true)
+    kt = KDTree(X')
+    nx, _ = knn(kt, X', k + 1, true)
     nn = hcat(nx...)'
     nn = nn[:, 2:end]
 
@@ -136,26 +152,22 @@ function qregnn(y::Vector{Float64}, x::Matrix{Float64}; p::Float64=0.5, k::Int =
         @constraint(model, rfit[nn[:, j]] - rfit .<= dcap[:, j])
     end
 
-    qr = Qreg(y, x, nn, kt, model, Vector{Float64}(), -1, rpos, rneg, dcap, rfit)
+    qr = QNN(y, X, nn, kt, model, Vector{Float64}(), -1, rpos, rneg, dcap, rfit)
 
-	if dofit
-		fit!(qr, p; lam=lam)
-	end
-
+	fit!(qr, p; lam=lam)
 	return qr
 end
-
 
 # Estimate the p'th quantiles for the population represented by the data
 # in qr. lam is a penalty parameter controlling the smoothness of the
 # fit.
-function StatsBase.fit!(qr::Qreg, p::Float64; lam::Float64=0.1)
+function fit!(qr::QNN, p::Float64; lam::Float64=0.1)
 
     @objective(qr.model, Min, sum(p * qr.rpos + (1 - p) * qr.rneg) + lam * sum(qr.dcap))
 
     optimize!(qr.model)
     if termination_status(qr.model) != MathOptInterface.OPTIMAL
-        error("Qreg fit did not converge")
+        @warn("QNN fit did not converge")
     end
     qr.fit = value.(qr.rfit)
 end
@@ -169,7 +181,7 @@ end
 # lambda is greater than 'lam_max'. The path is returned as an array
 # of triples containing the tuning parameter value, the BIC
 # value, and the degrees of freedom.
-function bic_search(qr::Qreg, p::Float64; fac = 1.2, lam_max = 1e6, dof_min = 2)
+function bic_search(qr::QNN, p::Float64; fac = 1.2, lam_max = 1e6, dof_min = 2)
 
     pa = []
 
