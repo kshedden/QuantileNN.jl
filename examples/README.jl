@@ -23,7 +23,7 @@ pp = [0.2, 0.5, 0.8]
 mm = [fit(QNN, X, y; p=p) for p in pp]
 
 x = range(-2, 2, 20)
-bw = 0.4
+bw = 1.0
 yy = [[predict_smooth(m, [0, v, 0], [bw]) for v in x] for m in mm]
 
 ps = [@sprintf("%.2f", p) for p in pp]
