@@ -29,6 +29,8 @@ plt = plot!(plt, x, yy[2], label=ps[2])
 plt = plot!(plt, x, yy[3], label=ps[3])
 Plots.savefig(plt, "./assets/readme1.svg")
 
+# ![Example plot 1](assets/readme1.svg)
+
 # ## References
 
 # [1] Steven Siwei Ye and Oscar Hernan Madrid Padilla.  Non-parametric Quantile
