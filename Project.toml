@@ -23,4 +23,4 @@ NearestNeighbors = "0.4"
 StableRNGs = "1.0"
 StatsAPI = "1.5"
 Tulip = "0.9"
-
+MathOptInterface = "0.10"
